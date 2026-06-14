@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  /* light theme neutrals (space-separated RGB channels) */
+  --bg: 255 255 255;
+  --backdrop: 233 234 241;
+  --surface: 255 255 255;
+  --surface-2: 250 250 254;
+  --ink: 26 26 46;
+  --ink-soft: 107 111 134;
+  --muted: 146 150 173;
+  --line: 236 236 243;
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: 17 18 27;
+  --backdrop: 8 8 13;
+  --surface: 26 27 40;
+  --surface-2: 30 31 46;
+  --ink: 237 238 245;
+  --ink-soft: 178 181 201;
+  --muted: 132 136 160;
+  --line: 42 44 60;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: rgb(var(--backdrop));
+  color: rgb(var(--ink));
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@layer components {
+  /* Glossy surface card (adapts to theme) */
+  .card {
+    @apply rounded-2xl shadow-card;
+    border: 1px solid rgb(var(--line));
+    background-image: linear-gradient(
+      170deg,
+      rgb(var(--surface)) 0%,
+      rgb(var(--surface-2)) 100%
+    );
+  }
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--ink) / 0.05),
+      rgb(var(--ink) / 0.1),
+      rgb(var(--ink) / 0.05)
+    );
+    background-size: 200% 100%;
+    @apply rounded-md animate-shimmer;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-2xs font-semibold;
+  }
+  .btn-gloss {
+    @apply bg-gloss-primary text-white shadow-gloss;
+  }
+  .safe-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4.75rem);
+  }
+}
