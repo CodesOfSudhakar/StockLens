@@ -1,11 +1,55 @@
 # StockLens 📈
 
-A mobile-first **React PWA** for Indian stock-market analysis, backed by a
-**FastAPI + LangGraph** service. Four screens, a three-agent AI outlook
-pipeline, and graceful mock data so it runs out of the box — no credentials
-required to demo.
+[![CI](https://github.com/CodesOfSudhakar/StockLens/actions/workflows/ci.yml/badge.svg)](https://github.com/CodesOfSudhakar/StockLens/actions/workflows/ci.yml)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
-> For research / education only. **Not investment advice.**
+A mobile-first **React PWA** for Indian stock-market analysis, backed by a
+**FastAPI + LangGraph** service.
+
+> ⚠️ For research / education only. **Not investment advice.**
+
+---
+
+## What is StockLens?
+
+StockLens puts the Indian market on a single phone screen and turns raw market
+data into a plain-English read. Instead of juggling a charting app, an
+option-chain site, and a news feed, you get one place that answers the question
+most retail traders actually care about:
+
+> **"What's the index likely to do next, and why?"**
+
+It does this in two layers:
+
+1. **A glanceable dashboard** — live indices, India VIX, market breadth,
+   gainers/losers, candlesticks with EMAs and RSI, the option chain (OI
+   buildups, PCR, Max Pain), and sentiment-tagged news.
+2. **An AI second opinion** — one tap runs a multi-agent pipeline where a
+   Technical, an Options-Interest, and a News agent each form a view, and a
+   Supervisor reconciles them into a single **Bias / Range / Key Levels / Risk**
+   call with a confidence score — and shows each agent's reasoning so the verdict
+   is explainable, not a black box.
+
+### Who it's for
+
+Retail index traders and options traders on the NSE/BSE who want a fast,
+mobile-first "morning brief" and a structured, explainable outlook — plus
+developers interested in a worked example of a LangGraph multi-agent pipeline
+wired to a real-time data backend.
+
+### Why it exists
+
+- **Consolidation** — technicals, options data, and news in one mobile view.
+- **Explainable AI** — the outlook shows *how* each agent reasoned, not just a verdict.
+- **Runs anywhere, instantly** — ships with deterministic mock data, so it's
+  fully demoable with zero API keys; adding real credentials upgrades it to live
+  data in place.
+
+> ### 📊 Data status
+> Out of the box, all numbers are **deterministic synthetic data** (realistic but
+> not live), so the app works without any keys. Angel One credentials currently
+> establish an authenticated session but the live quote/candle/option-chain fetch
+> is a planned next step — see [Roadmap](#roadmap). Don't trade on these values.
 
 ---
 
@@ -140,7 +184,26 @@ Coverage spans unit, edge-case, negative, and regression scenarios:
   credential headers, theme resolution + `.dark` toggling, and component
   rendering (SentimentPill, IndexCard) including click handling.
 
+## Continuous integration
+
+Every push and pull request runs both suites via GitHub Actions
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): the backend `pytest`
+job on Python 3.10 and the frontend `vitest` job on Node 20. The badge at the
+top reflects the latest run.
+
+## Roadmap
+
+- [ ] Wire the authenticated Angel One session to **live** quotes, candles, and
+      option-chain data (keep mock as automatic fallback when markets are
+      closed or creds are absent).
+- [ ] Persist the last AI outlook and show a freshness timestamp.
+- [ ] WebSocket streaming for live LTP updates on Home.
+
 ## Out of scope (Phase 2)
 
 Harmonic patterns, option Greeks, and Fibonacci tooling are intentionally
 **not** built.
+
+## License
+
+Released under the [MIT License](LICENSE) © 2026 Sudhakar Sukumar.
