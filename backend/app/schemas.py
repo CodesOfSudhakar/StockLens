@@ -70,6 +70,50 @@ class NewsItem(BaseModel):
     summary: str | None = None
 
 
+# ---- Phase 2 analytics ----
+class FibLevel(BaseModel):
+    ratio: float
+    price: float
+    kind: str  # anchor | retracement | extension
+
+
+class Fibonacci(BaseModel):
+    high: float
+    low: float
+    direction: str  # up | down
+    levels: list[FibLevel]
+
+
+class GreekSet(BaseModel):
+    delta: float
+    gamma: float
+    theta: float
+    vega: float
+    rho: float
+
+
+class StrikeGreeks(BaseModel):
+    strike: int
+    ce: GreekSet
+    pe: GreekSet
+
+
+class GreeksData(BaseModel):
+    sigma: float        # annualised volatility used (decimal, e.g. 0.16)
+    tDays: float        # days to assumed expiry
+    r: float            # risk-free rate used
+    atm: int
+    rows: list[StrikeGreeks]
+
+
+class HarmonicPattern(BaseModel):
+    name: str
+    direction: str      # bullish | bearish
+    prz: float          # potential reversal zone (D)
+    points: dict[str, float]
+    ratios: dict[str, float]
+
+
 class Analysis(BaseModel):
     symbol: str
     timeframe: str
@@ -77,6 +121,9 @@ class Analysis(BaseModel):
     rsi: list[RsiPoint]
     oi: OIData
     news: list[NewsItem]
+    fibonacci: Fibonacci | None = None
+    greeks: GreeksData | None = None
+    harmonics: list[HarmonicPattern] = []
     source: str = "mock"
 
 

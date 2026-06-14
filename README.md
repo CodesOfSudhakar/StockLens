@@ -46,10 +46,12 @@ wired to a real-time data backend.
   data in place.
 
 > ### 📊 Data status
-> Out of the box, all numbers are **deterministic synthetic data** (realistic but
-> not live), so the app works without any keys. Angel One credentials currently
-> establish an authenticated session but the live quote/candle/option-chain fetch
-> is a planned next step — see [Roadmap](#roadmap). Don't trade on these values.
+> Without keys, all numbers are **deterministic synthetic data** (realistic but
+> not live), so the app works out of the box. Adding **Angel One** credentials in
+> Settings switches Home quotes/VIX, the candle chart, and the option chain to
+> **live** data, with automatic fallback to mock on any failure. The live path is
+> wired to SmartAPI but is best-effort (untested against a funded account in this
+> repo) — always verify before relying on it. **Not investment advice.**
 
 ---
 
@@ -65,10 +67,12 @@ wired to a real-time data backend.
 
 1. **Home** — live indices (Nifty 50, Bank Nifty, Fin Nifty, MidCap, Sensex),
    India VIX, market breadth, top gainers/losers, overall sentiment pill.
-2. **Analysis** — candlestick chart with EMA 9/26/50/100, timeframe toggle
-   (1H/4H/1D/1W), RSI panel, option-chain OI table with buildup classification
-   (Long Buildup / Short Covering / Long Unwinding / Short Buildup), PCR,
-   Max Pain, and a Groq-tagged news feed.
+2. **Analysis** — candlestick chart with EMA 9/26/50/100 and a **Fibonacci**
+   overlay, timeframe toggle (1H/4H/1D/1W), RSI panel, option-chain OI table
+   with buildup classification (Long Buildup / Short Covering / Long Unwinding /
+   Short Buildup), PCR, Max Pain, a **Black-Scholes option-Greeks** panel
+   (Δ/Γ/Θ/V around ATM), **harmonic-pattern** detection (Gartley / Bat /
+   Butterfly / Crab), and a Groq-tagged news feed.
 3. **AI Outlook** — one button runs a LangGraph pipeline of three specialists
    (Technical · OI · News) converging on a Supervisor that outputs
    **Bias / Range / Key Levels / Risk** with a confidence score.
@@ -147,7 +151,8 @@ backend/app/
 ├── deps.py            # per-request Credentials from headers
 ├── schemas.py         # Pydantic response models
 ├── routers/           # market · analysis · outlook
-├── services/          # angel_one · groq_client · indicators · oi_analysis
+├── services/          # angel_one · scrip_master · live_transforms · groq_client
+│                      # indicators · oi_analysis · fibonacci · greeks · harmonics
 └── agents/            # LangGraph pipeline
     ├── graph.py       # START ─> [technical, oi, news] ─> supervisor ─> END
     ├── technical_agent.py · oi_agent.py · news_agent.py · supervisor.py
@@ -157,7 +162,7 @@ backend/app/
 ## Testing
 
 ```powershell
-# Backend — 74 tests (pytest)
+# Backend — 101 tests (pytest)
 cd backend
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m pytest
@@ -178,8 +183,15 @@ Coverage spans unit, edge-case, negative, and regression scenarios:
   returns `None` without creds.
 - **Agents** — `build_facts`, full pipeline across all five indices,
   determinism, supervisor synthesis (agreement vs. conflict).
-- **API** — every endpoint, param defaults, unknown route (404), wrong method
-  (405), invalid body (422), and a fake-Groq-key path that must not 500.
+- **Greeks** — Black-Scholes vs. reference values, put-call parity, delta
+  bounds, expiry intrinsic, implied-vol round-trip.
+- **Fibonacci** — up/down swing direction, level math, flat/short guards.
+- **Harmonics** — zigzag pivots, noise rejection, synthetic Gartley detection.
+- **Live transforms** — candle parsing/sorting, 4H & weekly resampling, quote
+  parsing, option-chain assembly, scrip-master nearest-expiry selection.
+- **API** — every endpoint, Phase-2 analytics fields, param defaults, unknown
+  route (404), wrong method (405), invalid body (422), and a fake-Groq-key path
+  that must not 500.
 - **Frontend** — settings store (merge/persist/corrupt-JSON/pub-sub),
   credential headers, theme resolution + `.dark` toggling, and component
   rendering (SentimentPill, IndexCard) including click handling.
@@ -193,16 +205,12 @@ top reflects the latest run.
 
 ## Roadmap
 
-- [ ] Wire the authenticated Angel One session to **live** quotes, candles, and
-      option-chain data (keep mock as automatic fallback when markets are
-      closed or creds are absent).
+- [x] **Phase 2 analytics** — Fibonacci levels, option Greeks, harmonic patterns.
+- [x] Wire the authenticated Angel One session to **live** quotes, candles, and
+      option-chain data (mock stays as automatic fallback).
+- [ ] Validate the live SmartAPI paths against a funded account end-to-end.
 - [ ] Persist the last AI outlook and show a freshness timestamp.
 - [ ] WebSocket streaming for live LTP updates on Home.
-
-## Out of scope (Phase 2)
-
-Harmonic patterns, option Greeks, and Fibonacci tooling are intentionally
-**not** built.
 
 ## License
 

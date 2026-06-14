@@ -34,6 +34,20 @@ def test_analysis_defaults():
     assert len(data["news"]) == 5
 
 
+def test_analysis_includes_phase2_analytics():
+    data = client.get("/api/analysis", params={"symbol": "NIFTY"}).json()
+    # Fibonacci
+    assert data["fibonacci"]["direction"] in {"up", "down"}
+    assert data["fibonacci"]["levels"]
+    # Greeks (ATM band of 5 strikes, ATM call delta near 0.5)
+    g = data["greeks"]
+    assert len(g["rows"]) == 5 and 0 < g["sigma"] < 1
+    atm_row = next(r for r in g["rows"] if r["strike"] == g["atm"])
+    assert 0.3 < atm_row["ce"]["delta"] < 0.7
+    # Harmonics is a list (possibly empty)
+    assert isinstance(data["harmonics"], list)
+
+
 @pytest.mark.parametrize("tf", ["1H", "4H", "1D", "1W"])
 def test_analysis_each_timeframe(tf):
     r = client.get("/api/analysis", params={"symbol": "BANKNIFTY", "timeframe": tf})

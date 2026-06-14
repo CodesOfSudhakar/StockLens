@@ -5,6 +5,8 @@ import CandleChart from '../components/CandleChart.jsx'
 import RSIPanel from '../components/RSIPanel.jsx'
 import OITable from '../components/OITable.jsx'
 import NewsFeed from '../components/NewsFeed.jsx'
+import GreeksPanel from '../components/GreeksPanel.jsx'
+import Harmonics from '../components/Harmonics.jsx'
 import { Skeleton } from '../components/Skeleton.jsx'
 import { getAnalysis } from '../api/client.js'
 import { getSettings, INDICES, saveSettings } from '../store/settings.js'
@@ -93,14 +95,40 @@ export default function Analysis() {
         ))}
       </div>
 
-      {/* Chart */}
+      {/* Chart with Fibonacci overlay */}
       <div className="card mb-4 p-3">
         {data ? (
-          <CandleChart candles={data.candles} />
+          <CandleChart candles={data.candles} fibLevels={data.fibonacci?.levels || []} />
         ) : (
           <Skeleton className="h-[320px] w-full rounded-lg" />
         )}
       </div>
+
+      {/* Fibonacci summary */}
+      {data?.fibonacci && (
+        <div className="card mb-4 p-3.5">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-primary">Fibonacci</h3>
+            <span className="text-2xs font-semibold text-muted">
+              {data.fibonacci.direction === 'up' ? 'Up swing' : 'Down swing'} ·{' '}
+              {data.fibonacci.low.toLocaleString('en-IN')}–
+              {data.fibonacci.high.toLocaleString('en-IN')}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {data.fibonacci.levels
+              .filter((l) => l.kind === 'retracement')
+              .map((l) => (
+                <span
+                  key={l.ratio}
+                  className="rounded-md bg-neutral/10 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[#B45309]"
+                >
+                  {(l.ratio * 100).toFixed(1)}% · {l.price.toLocaleString('en-IN')}
+                </span>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* RSI */}
       <div className="mb-4">
@@ -134,6 +162,27 @@ export default function Analysis() {
           <OITable rows={data.oi.chain} spot={data.oi.spot} />
         ) : (
           <Skeleton className="h-64 w-full rounded-2xl" />
+        )}
+      </div>
+
+      {/* Option Greeks */}
+      <div className="mb-4">
+        {data ? (
+          <GreeksPanel greeks={data.greeks} />
+        ) : (
+          <Skeleton className="h-48 w-full rounded-2xl" />
+        )}
+      </div>
+
+      {/* Harmonic patterns */}
+      <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">
+        Harmonic Patterns
+      </h2>
+      <div className="mb-4">
+        {data ? (
+          <Harmonics patterns={data.harmonics} />
+        ) : (
+          <Skeleton className="h-20 w-full rounded-2xl" />
         )}
       </div>
 

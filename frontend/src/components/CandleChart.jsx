@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react'
-import { createChart, CrosshairMode } from 'lightweight-charts'
+import { createChart, CrosshairMode, LineStyle } from 'lightweight-charts'
 import { useResolvedTheme } from '../store/useTheme.js'
+
+// Fibonacci overlay line colour by level type.
+const FIB_COLOR = { anchor: '#9296AD', retracement: '#F59E0B', extension: '#9333EA' }
 
 // EMA line colours keyed by period (vivid on both light & dark).
 const EMA_COLORS = {
@@ -28,7 +31,11 @@ function ema(values, period) {
   return out
 }
 
-export default function CandleChart({ candles = [], emaPeriods = [9, 26, 50, 100] }) {
+export default function CandleChart({
+  candles = [],
+  emaPeriods = [9, 26, 50, 100],
+  fibLevels = [],
+}) {
   const containerRef = useRef(null)
   const chartRef = useRef(null)
   const theme = useResolvedTheme()
@@ -65,6 +72,20 @@ export default function CandleChart({ candles = [], emaPeriods = [9, 26, 50, 100
     })
     series.setData(candles)
 
+    // Fibonacci retracement / extension overlay lines.
+    fibLevels
+      .filter((l) => l.kind !== 'extension') // keep retracements + anchors, less clutter
+      .forEach((l) => {
+        series.createPriceLine({
+          price: l.price,
+          color: FIB_COLOR[l.kind] || '#9296AD',
+          lineWidth: 1,
+          lineStyle: l.kind === 'anchor' ? LineStyle.Solid : LineStyle.Dotted,
+          axisLabelVisible: true,
+          title: l.kind === 'anchor' ? '' : `${(l.ratio * 100).toFixed(1)}%`,
+        })
+      })
+
     emaPeriods.forEach((p) => {
       const line = chart.addLineSeries({
         color: EMA_COLORS[p] || '#888',
@@ -87,7 +108,7 @@ export default function CandleChart({ candles = [], emaPeriods = [9, 26, 50, 100
       ro.disconnect()
       chart.remove()
     }
-  }, [candles, emaPeriods, theme])
+  }, [candles, emaPeriods, fibLevels, theme])
 
   return (
     <div>
