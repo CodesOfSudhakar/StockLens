@@ -17,7 +17,7 @@ import httpx
 
 SCRIP_URL = (
     "https://margincalculator.angelbroking.com/OpenAPI_File/files/"
-    "OpenAPISymbolMaster.json"
+    "OpenAPIScripMaster.json"
 )
 
 # Well-known spot-index tokens (NSE unless noted). Used directly for quotes so
@@ -59,6 +59,37 @@ def load_master(timeout: float = 15.0) -> list[dict] | None:
         return rows
     except Exception:
         return None
+
+
+# A liquid large-cap universe for computing gainers/losers & breadth.
+# (Angel getMarketData accepts up to ~50 tokens per call.)
+NIFTY_UNIVERSE = [
+    "RELIANCE", "HDFCBANK", "ICICIBANK", "INFY", "TCS", "SBIN", "BHARTIARTL",
+    "ITC", "LT", "AXISBANK", "KOTAKBANK", "HINDUNILVR", "BAJFINANCE", "MARUTI",
+    "SUNPHARMA", "TATAMOTORS", "NTPC", "POWERGRID", "TITAN", "ULTRACEMCO",
+    "ASIANPAINT", "WIPRO", "HCLTECH", "ADANIENT", "TATASTEEL", "JSWSTEEL",
+    "M&M", "NESTLEIND", "BAJAJFINSV", "TECHM",
+]
+
+
+def equity_tokens(symbols: list[str], rows: list[dict] | None = None) -> dict[str, str]:
+    """Resolve NSE cash-segment tokens for plain equity symbols.
+
+    Matches rows whose tradingsymbol is '<SYMBOL>-EQ' on the NSE segment.
+    Returns {symbol: token}. Pure given `rows`."""
+    rows = rows if rows is not None else load_master()
+    if not rows:
+        return {}
+    wanted = {s.upper() for s in symbols}
+    out: dict[str, str] = {}
+    for r in rows:
+        sym = (r.get("symbol") or "").upper()
+        if r.get("exch_seg") != "NSE" or not sym.endswith("-EQ"):
+            continue
+        base = sym[:-3]
+        if base in wanted and base not in out:
+            out[base] = r.get("token")
+    return out
 
 
 def _parse_expiry(value: str):

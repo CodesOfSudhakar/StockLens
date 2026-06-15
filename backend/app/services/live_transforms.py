@@ -69,6 +69,19 @@ def resample(candles: list[dict], mode: str | None) -> list[dict]:
     return candles
 
 
+def movers_and_breadth(changes: dict[str, float]) -> dict:
+    """Given {symbol: percentChange}, return top gainers/losers and breadth."""
+    items = [{"symbol": s, "changePct": round(p, 2)} for s, p in changes.items()]
+    items.sort(key=lambda m: m["changePct"], reverse=True)
+    adv = sum(1 for m in items if m["changePct"] > 0)
+    dec = sum(1 for m in items if m["changePct"] < 0)
+    return {
+        "gainers": items[:4],
+        "losers": items[-4:][::-1] if len(items) >= 4 else list(reversed(items)),
+        "breadth": {"advances": adv, "declines": dec, "unchanged": len(items) - adv - dec},
+    }
+
+
 def parse_index_quote(symbol: str, label: str, item: dict) -> dict:
     """Map one Angel getMarketData 'fetched' item to our IndexQuote shape."""
     ltp = float(item.get("ltp", 0) or 0)

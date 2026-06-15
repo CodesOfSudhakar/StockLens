@@ -6,13 +6,16 @@ deterministic synthetic generator so the whole app stays usable offline.
 """
 from __future__ import annotations
 
+import logging
 import math
+import os
 import random
+import sys
 import time
 from datetime import datetime, timedelta, timezone
 
 from ..deps import Credentials
-from . import indicators, live_transforms, oi_analysis, scrip_master
+from . import indicators, live_transforms, oi_analysis, scrip_master, yahoo
 
 # Index metadata: label, an anchor spot price, and option-strike step.
 INDEX_META: dict[str, dict] = {
@@ -35,6 +38,21 @@ _NIFTY_STOCKS = [
     "RELIANCE", "HDFCBANK", "ICICIBANK", "INFY", "TCS", "SBIN", "BHARTIARTL",
     "ITC", "LT", "AXISBANK", "KOTAKBANK", "HINDUNILVR", "BAJFINANCE", "MARUTI",
 ]
+
+
+log = logging.getLogger("stocklens.angel")
+if not log.handlers:
+    _h = logging.StreamHandler(sys.stderr)
+    _h.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    log.addHandler(_h)
+    log.setLevel(logging.INFO)
+    log.propagate = False
+
+
+def _offline() -> bool:
+    """When set (e.g. in tests/CI), skip all free-network providers so the
+    deterministic mock is used — keeps the suite hermetic."""
+    return bool(os.environ.get("STOCKLENS_OFFLINE"))
 
 
 def _rng(seed: str) -> random.Random:
@@ -69,9 +87,11 @@ def _live_session(creds: Credentials):
         totp = pyotp.TOTP(creds.angel_totp_secret).now() if creds.angel_totp_secret else ""
         api.generateSession(creds.angel_client_id, creds.angel_pin, totp)
         _session_cache[key] = (api, now + _SESSION_TTL)
+        log.info("Angel session established for client %s", creds.angel_client_id)
         return api
-    except Exception:
+    except Exception as e:
         # Library missing, bad creds, or network issue — fall back to mock.
+        log.warning("Angel session FAILED for client %s: %r", creds.angel_client_id, e)
         return None
 
 
@@ -103,6 +123,23 @@ def _fetch_live_indices(api) -> tuple[list[dict], float]:
     vix_item = quotes.get(scrip_master.VIX_TOKEN["token"], {})
     vix = round(float(vix_item.get("ltp", 0) or 0), 2)
     return indices, vix
+
+
+def _fetch_live_movers(api) -> dict:
+    """Real gainers/losers + breadth from a liquid Nifty universe."""
+    tokens = scrip_master.equity_tokens(scrip_master.NIFTY_UNIVERSE)
+    if not tokens:
+        raise RuntimeError("could not resolve equity tokens")
+    quotes = _market_data(api, {"NSE": list(tokens.values())})
+    tok2sym = {str(v): k for k, v in tokens.items()}
+    changes: dict[str, float] = {}
+    for tok, item in quotes.items():
+        sym = tok2sym.get(str(tok))
+        if sym:
+            changes[sym] = float(item.get("percentChange", 0) or 0)
+    if not changes:
+        raise RuntimeError("no equity quotes returned")
+    return live_transforms.movers_and_breadth(changes)
 
 
 def _fetch_live_candles(api, symbol: str, timeframe: str) -> list[dict]:
@@ -220,53 +257,80 @@ def _build_oi(symbol: str, spot: float) -> dict:
 # --------------------------------------------------------------------------
 # Public API (live-first, with graceful per-section fallback to mock)
 # --------------------------------------------------------------------------
+def _mock_index(sym: str) -> dict:
+    meta = INDEX_META.get(sym, INDEX_META["NIFTY"])
+    rnd = _rng(f"{sym}:overview:{datetime.now(timezone.utc):%Y-%m-%d-%H}")
+    change_pct = rnd.uniform(-1.1, 1.3)
+    ltp = meta["anchor"] * (1 + change_pct / 100)
+    return {
+        "symbol": sym,
+        "label": meta["label"],
+        "ltp": round(ltp, 2),
+        "change": round(ltp - meta["anchor"], 2),
+        "changePct": round(change_pct, 2),
+    }
+
+
 def _mock_indices() -> list[dict]:
-    indices = []
-    for sym, meta in INDEX_META.items():
-        rnd = _rng(f"{sym}:overview:{datetime.now(timezone.utc):%Y-%m-%d-%H}")
-        change_pct = rnd.uniform(-1.1, 1.3)
-        ltp = meta["anchor"] * (1 + change_pct / 100)
-        indices.append(
-            {
-                "symbol": sym,
-                "label": meta["label"],
-                "ltp": round(ltp, 2),
-                "change": round(ltp - meta["anchor"], 2),
-                "changePct": round(change_pct, 2),
-            }
-        )
-    return indices
+    return [_mock_index(sym) for sym in INDEX_META]
 
 
 def get_overview(creds: Credentials) -> dict:
     api = _live_session(creds)
+    log.info("overview: has_angel=%s", creds.has_angel)
 
-    # Indices + VIX: live when possible, else synthetic.
     source = "mock"
     vix = None
     indices = None
+    movers_data = None
+
+    # 1) Indices + VIX + movers via Angel.
     if api is not None:
         try:
             indices, vix = _fetch_live_indices(api)
             source = "live"
-        except Exception:
-            indices, vix = None, None
+        except Exception as e:
+            log.warning("Angel indices FAILED: %r", e)
+        try:
+            movers_data = _fetch_live_movers(api)
+        except Exception as e:
+            log.warning("Angel movers FAILED: %r", e)
+
+    # 2) Yahoo fallback for indices/VIX (free, no key).
+    if indices is None and not _offline():
+        try:
+            labels = {s: m["label"] for s, m in INDEX_META.items()}
+            yq, yvix = yahoo.fetch_index_quotes(labels)
+            if yq:
+                indices = [yq.get(s) or _mock_index(s) for s in INDEX_META]
+                vix = yvix if yvix is not None else vix
+                source = "yahoo"
+        except Exception as e:
+            log.warning("Yahoo indices FAILED: %r", e)
     if indices is None:
         indices = _mock_indices()
 
-    # Breadth and movers aren't exposed by SmartAPI cheaply -> always synthetic.
-    rnd = _rng(f"breadth:{datetime.now(timezone.utc):%Y-%m-%d-%H}")
-    if vix is None:
-        vix = round(rnd.uniform(11, 18), 2)
-    advances = rnd.randint(900, 1600)
-    declines = rnd.randint(700, 1500)
+    # India VIX: Angel often omits it from the FULL batch -> Yahoo fallback.
+    if not vix and not _offline():
+        vix = yahoo.fetch_vix()
 
-    movers = [
-        {"symbol": s, "changePct": round(rnd.uniform(-6, 6), 2)} for s in _NIFTY_STOCKS
-    ]
-    movers.sort(key=lambda m: m["changePct"], reverse=True)
-    gainers = movers[:4]
-    losers = movers[-4:][::-1]
+    # 3) Breadth/movers: live if available, else synthetic.
+    rnd = _rng(f"breadth:{datetime.now(timezone.utc):%Y-%m-%d-%H}")
+    if not vix:
+        vix = round(rnd.uniform(11, 18), 2)
+
+    if movers_data is None:
+        m = [{"symbol": s, "changePct": round(rnd.uniform(-6, 6), 2)} for s in _NIFTY_STOCKS]
+        m.sort(key=lambda x: x["changePct"], reverse=True)
+        movers_data = {
+            "gainers": m[:4],
+            "losers": m[-4:][::-1],
+            "breadth": {
+                "advances": rnd.randint(900, 1600),
+                "declines": rnd.randint(700, 1500),
+                "unchanged": rnd.randint(40, 120),
+            },
+        }
 
     avg = sum(i["changePct"] for i in indices) / len(indices)
     if avg > 0.25:
@@ -279,9 +343,9 @@ def get_overview(creds: Credentials) -> dict:
     return {
         "indices": indices,
         "vix": vix,
-        "breadth": {"advances": advances, "declines": declines, "unchanged": rnd.randint(40, 120)},
-        "gainers": gainers,
-        "losers": losers,
+        "breadth": movers_data["breadth"],
+        "gainers": movers_data["gainers"],
+        "losers": movers_data["losers"],
         "sentiment": sentiment,
         "sentimentLabel": label,
         "source": source,
@@ -294,7 +358,15 @@ def get_candles_and_rsi(creds: Credentials, symbol: str, timeframe: str):
     if api is not None:
         try:
             candles = _fetch_live_candles(api, symbol, timeframe)
-        except Exception:
+        except Exception as e:
+            log.warning("Angel candle fetch FAILED for %s/%s: %r", symbol, timeframe, e)
+            candles = None
+    if not candles and not _offline():
+        # Free Yahoo fallback (real data, no key) before synthetic.
+        try:
+            candles = yahoo.fetch_candles(symbol, timeframe)
+        except Exception as e:
+            log.warning("Yahoo candle fetch FAILED for %s/%s: %r", symbol, timeframe, e)
             candles = None
     if not candles:
         candles = _gen_candles(symbol, timeframe)
@@ -310,6 +382,6 @@ def get_oi(creds: Credentials, symbol: str, spot: float) -> dict:
     if api is not None:
         try:
             return _fetch_live_oi(api, symbol, spot)
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning("Angel OI fetch FAILED for %s: %r", symbol, e)
     return _build_oi(symbol, spot)

@@ -48,6 +48,27 @@ def test_resample_weekly_groups_by_week():
 
 
 # ---------- quotes / chain ----------
+def test_movers_and_breadth():
+    changes = {"A": 5.0, "B": 2.0, "C": -1.0, "D": -3.0, "E": 0.0, "F": 4.0, "G": -2.0}
+    out = live_transforms.movers_and_breadth(changes)
+    assert out["gainers"][0]["symbol"] == "A"  # highest first
+    assert out["losers"][0]["symbol"] == "D"  # most negative first
+    assert out["breadth"]["advances"] == 3  # A,B,F
+    assert out["breadth"]["declines"] == 3  # C,D,G
+    assert out["breadth"]["unchanged"] == 1  # E
+
+
+def test_equity_tokens_resolution():
+    rows = [
+        {"symbol": "RELIANCE-EQ", "exch_seg": "NSE", "token": "2885"},
+        {"symbol": "TCS-EQ", "exch_seg": "NSE", "token": "11536"},
+        {"symbol": "RELIANCE", "exch_seg": "BSE", "token": "500325"},  # wrong seg
+        {"symbol": "INFY-EQ", "exch_seg": "NSE", "token": "1594"},
+    ]
+    out = scrip_master.equity_tokens(["RELIANCE", "TCS", "NOTLISTED"], rows)
+    assert out == {"RELIANCE": "2885", "TCS": "11536"}
+
+
 def test_parse_index_quote():
     q = live_transforms.parse_index_quote(
         "NIFTY", "Nifty 50", {"ltp": 24800.5, "netChange": 50.2, "percentChange": 0.2}

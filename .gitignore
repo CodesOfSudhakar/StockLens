@@ -9,6 +9,7 @@ backend/.venv/
 __pycache__/
 *.pyc
 backend/.env
+backend/logs/
 .pytest_cache/
 
 # Editor / OS / tooling

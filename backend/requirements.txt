@@ -11,3 +11,6 @@ langchain-core==0.3.10
 langchain-groq==0.2.0
 langgraph==0.2.35
 smartapi-python==1.5.5
+# smartapi-python transitive deps that its wheel doesn't always pull in:
+logzero==1.7.0
+websocket-client==1.9.0

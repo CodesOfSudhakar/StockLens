@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     angel_totp_secret: str = ""
     groq_api_key: str = ""
 
-    groq_model: str = "llama3-70b-8192"
+    groq_model: str = "llama-3.3-70b-versatile"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
