@@ -55,6 +55,7 @@ export default function Home() {
 
   return (
     <PageTransition
+      brand
       title="StockLens"
       subtitle="Indian markets · live overview"
       action={

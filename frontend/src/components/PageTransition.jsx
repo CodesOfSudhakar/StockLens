@@ -6,7 +6,7 @@ const variants = {
   exit: { opacity: 0, y: -8 },
 }
 
-export default function PageTransition({ title, subtitle, action, children }) {
+export default function PageTransition({ title, subtitle, action, brand, children }) {
   return (
     <motion.div
       variants={variants}
@@ -19,9 +19,16 @@ export default function PageTransition({ title, subtitle, action, children }) {
       {(title || action) && (
         <header className="mb-4 flex items-start justify-between">
           <div>
-            {title && (
-              <h1 className="text-base font-bold tracking-tight text-ink">{title}</h1>
-            )}
+            {title &&
+              (brand ? (
+                <h1 className="bg-gloss-primary bg-clip-text font-display text-2xl font-bold tracking-tight text-transparent">
+                  {title}
+                </h1>
+              ) : (
+                <h1 className="font-display text-base font-bold tracking-tight text-ink">
+                  {title}
+                </h1>
+              ))}
             {subtitle && (
               <p className="mt-0.5 text-2xs font-medium text-muted">{subtitle}</p>
             )}
